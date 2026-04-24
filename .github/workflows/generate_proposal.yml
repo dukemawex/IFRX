@@ -22,7 +22,7 @@ on:
 jobs:
   generate:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 30
     permissions:
       contents: read
 
@@ -30,7 +30,7 @@ jobs:
       TINYFISH_API_KEY: ${{ secrets.TINYFISH_API_KEY }}
       TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
       OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-      RESEARCH_DEPTH: ${{ inputs.depth || 'deep' }}
+      RESEARCH_DEPTH: ${{ inputs.depth || 'quick' }}
 
     steps:
       - name: Checkout repository
