@@ -2,6 +2,7 @@
 Agent 5 — synthesis_agent.py
 Calls OpenRouter free-tier LLM to synthesise all research into a PhD proposal.
 Uses requests only — NO anthropic SDK.
+Research sources: Tavily search/extract/deep-research results and Union Bank case study data.
 """
 
 import json
@@ -21,18 +22,13 @@ MAX_CONTEXT_CHARS = 28_000  # ~8k tokens safety threshold
 
 
 def load_research() -> dict:
-    """Load and combine all research artefacts from all four sources."""
+    """Load and combine all research artefacts from Tavily and the case study."""
     research_dir = Path("research")
 
-    tinyfish_path = research_dir / "tinyfish_results.json"
     tavily_path = research_dir / "tavily_results.json"
     tavily_research_path = research_dir / "tavily_research.json"
     case_study_path = research_dir / "case_study_data.json"
     queries_path = research_dir / "queries.json"
-
-    tinyfish_results = []
-    if tinyfish_path.exists():
-        tinyfish_results = json.loads(tinyfish_path.read_text())[:60]
 
     tavily_results = []
     if tavily_path.exists():
@@ -51,7 +47,6 @@ def load_research() -> dict:
         queries_data = json.loads(queries_path.read_text())
 
     return {
-        "tinyfish_results": tinyfish_results,
         "tavily_results": tavily_results,
         "tavily_research": tavily_research,
         "case_study_data": case_study_data,
@@ -61,43 +56,13 @@ def load_research() -> dict:
 
 def build_context(research: dict) -> str:
     """
-    Build a combined context string from all four sources, prioritised by
+    Build a combined context string from all three sources, prioritised by
     information density. The case study data is always placed last (highest
     priority anchor) and never truncated.
     """
     parts: list[str] = []
 
-    # ── Source A: TinyFish results (rich metadata) ────────────────────────────
-    for i, item in enumerate(research.get("tinyfish_results", []), start=1):
-        authors = item.get("authors") or []
-        author_str = ", ".join(authors[:3]) if isinstance(authors, list) else str(authors)
-        if isinstance(authors, list) and len(authors) > 3:
-            author_str += " et al."
-
-        journal = item.get("journal_or_publisher", "")
-        doi = item.get("doi", "")
-        year = item.get("published_date", "")
-        text_snippet = (item.get("text") or "")[:500]
-
-        key_findings = item.get("key_findings") or item.get("highlights") or []
-        findings_str = " | ".join(str(f) for f in key_findings[:3])
-
-        gap = item.get("gap_identified", "")
-        theory = ", ".join(item.get("theory_applied") or [])
-        apa_cite = item.get("how_to_cite_apa7", "")
-
-        parts.append(
-            f"[TF-{i}] {item.get('title', '')} / {item.get('source', '')} / "
-            f"AUTHORS:{author_str} / YEAR:{year} / JOURNAL:{journal} / DOI:{doi} / "
-            f"CLUSTER:{item.get('cluster', '')} / "
-            f"{text_snippet} / "
-            f"FINDINGS: {findings_str}"
-            + (f" / GAP: {gap}" if gap else "")
-            + (f" / THEORIES: {theory}" if theory else "")
-            + (f" / APA: {apa_cite}" if apa_cite else "")
-        )
-
-    # ── Source B: Tavily standard search + extract results ────────────────────
+    # ── Source A: Tavily standard search + extract results ────────────────────
     for i, item in enumerate(research.get("tavily_results", []), start=1):
         tier = item.get("tier", "search")
         content_snippet = (
@@ -112,7 +77,7 @@ def build_context(research: dict) -> str:
             + (f" / ANSWER: {answer[:200]}" if answer else "")
         )
 
-    # ── Source C: Tavily deep research reports ────────────────────────────────
+    # ── Source B: Tavily deep research reports ────────────────────────────────
     for i, report in enumerate(research.get("tavily_research", []), start=1):
         cluster = report.get("cluster", "")
         # The report may come back as "report" string or nested "data"
@@ -133,7 +98,7 @@ def build_context(research: dict) -> str:
             + (f" / SOURCES: {source_urls}" if source_urls else "")
         )
 
-    # ── Source D: Live-enriched case study (always last, never truncated) ─────
+    # ── Source C: Live-enriched case study (always last, never truncated) ─────
     case_study = research.get("case_study_data", {})
     # Exclude bulk live_web_snippets from the main JSON dump to save tokens;
     # they are already summarised in TAV results above.
@@ -246,8 +211,7 @@ def main() -> None:
     context_str = build_context(research)
 
     instruction = (
-        "Using ALL sources above — [TF-N] TinyFish academic extractions, "
-        "[TAV-N:SEARCH] Tavily standard search results, "
+        "Using ALL sources above — [TAV-N:SEARCH] Tavily standard search results, "
         "[TAV-N:EXTRACT] Tavily full-page extractions from authoritative URLs, "
         "[DEEP-N] Tavily deep research synthesis reports, and "
         "the UNION BANK LIVE + BASELINE CASE STUDY DATA — "
@@ -259,11 +223,10 @@ def main() -> None:
 
     user_message = context_str + "\n\n---\n" + instruction
 
-    tf_count = len(research.get("tinyfish_results", []))
     tav_count = len(research.get("tavily_results", []))
     deep_count = len(research.get("tavily_research", []))
     print(
-        f"[synthesis_agent] Sources loaded: TinyFish={tf_count}, "
+        f"[synthesis_agent] Sources loaded: "
         f"Tavily={tav_count}, DeepResearch={deep_count}. "
         f"Context: {len(user_message)} chars. "
         f"Calling OpenRouter ({PRIMARY_MODEL})..."

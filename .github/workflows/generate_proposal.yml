@@ -27,7 +27,6 @@ jobs:
       contents: read
 
     env:
-      TINYFISH_API_KEY: ${{ secrets.TINYFISH_API_KEY }}
       TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
       OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
       RESEARCH_DEPTH: ${{ inputs.depth || 'quick' }}
@@ -47,9 +46,6 @@ jobs:
 
       - name: Run Orchestrator — decompose queries
         run: python agents/orchestrator.py
-
-      - name: Run TinyFish Agent — PhD-grade academic research
-        run: python agents/exa_agent.py
 
       - name: Run Tavily Agent — live web search
         run: python agents/tavily_agent.py
