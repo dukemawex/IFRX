@@ -43,11 +43,11 @@ README.md
 
 Add the following secrets to your repository under **Settings → Secrets and variables → Actions**:
 
-| Secret Name          | Description                                         |
-|----------------------|-----------------------------------------------------|
-| `EXA_API_KEY`        | Exa (TinyFish) API key — [exa.ai](https://exa.ai)  |
-| `TAVILY_API_KEY`     | Tavily API key — [tavily.com](https://tavily.com)   |
-| `OPENROUTER_API_KEY` | OpenRouter API key — [openrouter.ai](https://openrouter.ai) (free tier sufficient) |
+| Secret Name          | Description                                                                             |
+|----------------------|-----------------------------------------------------------------------------------------|
+| `TINYFISH_API_KEY`   | TinyFish automation API key — [agent.tinyfish.ai](https://agent.tinyfish.ai)           |
+| `TAVILY_API_KEY`     | Tavily API key — [tavily.com](https://tavily.com) (Research tier used)                 |
+| `OPENROUTER_API_KEY` | OpenRouter API key — [openrouter.ai](https://openrouter.ai) (free tier sufficient)     |
 
 ### Local Development
 
@@ -61,7 +61,7 @@ pip install -r requirements.txt
 
 ```bash
 cp .env.example .env
-# Edit .env and set real values for EXA_API_KEY, TAVILY_API_KEY, OPENROUTER_API_KEY
+# Edit .env and set real values for TINYFISH_API_KEY, TAVILY_API_KEY, OPENROUTER_API_KEY
 ```
 
 3. Export the environment variables and run each agent in order:
