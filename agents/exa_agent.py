@@ -31,7 +31,7 @@ Output: research/tinyfish_results.json
 
 import json
 import os
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, as_completed, TimeoutError as FuturesTimeoutError
 from pathlib import Path
 from threading import Lock
 
@@ -321,7 +321,7 @@ def _normalise(item: dict, query: str, cluster: str, seed_url: str) -> dict:
     }
 
 
-@retry(stop=stop_after_attempt(3), wait=wait_exponential(min=2, max=10))
+@retry(stop=stop_after_attempt(2), wait=wait_exponential(min=2, max=8))
 def search_tinyfish(query: str, seed_url: str, cluster: str) -> list[dict]:
     """
     Run a single TinyFish automation goal against one seed URL.
@@ -345,7 +345,7 @@ def search_tinyfish(query: str, seed_url: str, cluster: str) -> list[dict]:
     body = {"url": seed_url, "goal": goal}
 
     response = requests.post(
-        TINYFISH_URL, headers=headers, json=body, stream=True, timeout=90
+        TINYFISH_URL, headers=headers, json=body, stream=True, timeout=(15, 20)
     )
     response.raise_for_status()
 
@@ -402,10 +402,25 @@ def main() -> None:
 
     if tasks:
         max_workers = min(6, len(tasks))
+        # Hard wall-clock deadline derived from an env variable so it can be
+        # tuned without touching this file.  Default: 10 minutes, which fits
+        # comfortably inside the workflow's timeout-minutes: 15 budget.
+        AGENT_TIMEOUT_SECONDS = int(os.environ.get("TINYFISH_TIMEOUT_SECONDS", str(10 * 60)))
+        completed_count = 0
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             futures = [executor.submit(run_task, task) for task in tasks]
-            for future in as_completed(futures):
-                future.result()  # propagate unexpected exceptions
+            try:
+                for future in as_completed(futures, timeout=AGENT_TIMEOUT_SECONDS):
+                    future.result()  # propagate unexpected exceptions
+                    completed_count += 1
+            except FuturesTimeoutError:
+                pending = len(tasks) - completed_count
+                print(
+                    f"[tinyfish_agent] Wall-clock deadline reached "
+                    f"({AGENT_TIMEOUT_SECONDS}s) — "
+                    f"{completed_count}/{len(tasks)} tasks completed, "
+                    f"{pending} still pending. Saving partial results."
+                )
 
     research_dir = Path("research")
     research_dir.mkdir(exist_ok=True)
