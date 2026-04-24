@@ -1,0 +1,78 @@
+name: Generate PhD Proposal — IFRS Union Bank
+
+on:
+  workflow_dispatch:
+    inputs:
+      depth:
+        description: "Research depth"
+        required: false
+        default: "deep"
+        type: choice
+        options:
+          - quick
+          - standard
+          - deep
+  push:
+    branches:
+      - main
+    paths:
+      - "agents/**"
+      - "prompts/**"
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+
+    env:
+      TINYFISH_API_KEY: ${{ secrets.TINYFISH_API_KEY }}
+      TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
+      OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+      RESEARCH_DEPTH: ${{ inputs.depth || 'deep' }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run Orchestrator — decompose queries
+        run: python agents/orchestrator.py
+
+      - name: Run TinyFish Agent — PhD-grade academic research
+        run: python agents/exa_agent.py
+
+      - name: Run Tavily Agent — live web search
+        run: python agents/tavily_agent.py
+
+      - name: Run Case Study Agent — Union Bank data
+        run: python agents/case_study_agent.py
+
+      - name: Run Synthesis Agent — LLM proposal draft
+        run: python agents/synthesis_agent.py
+
+      - name: Run DOCX Writer — build Word document
+        run: python agents/docx_writer.py
+
+      - name: Upload PhD Proposal artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: phd-proposal-ifrs-union-bank
+          path: output/proposal_ifrs_union_bank.docx
+          retention-days: 30
+
+      - name: Upload raw research data artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: research-data-raw
+          path: research/
+          retention-days: 14

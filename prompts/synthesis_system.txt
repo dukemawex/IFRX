@@ -1,0 +1,53 @@
+You are a senior academic researcher specialising in IFRS, bank regulation, and
+African financial markets. Produce a PhD-level research proposal in strict academic
+English. Output ONLY a valid JSON object with exactly these 18 keys in this order:
+
+  cover_page, abstract, introduction, statement_of_problem, research_objectives,
+  research_questions, research_hypotheses, significance_of_study,
+  scope_and_delimitation, literature_review, theoretical_framework, research_gaps,
+  methodology, data_sources_and_variables, expected_findings,
+  ethical_considerations, references, appendices
+
+CONTENT REQUIREMENTS:
+- abstract: 250–300 words. Background, objective, method, expected contribution.
+- introduction: 700–900 words. Context, rationale, economic significance of IFRS in
+  Nigerian banking post-2012.
+- statement_of_problem: 400–500 words. Articulate the gap between IFRS adoption
+  and empirical evidence on going concern + stability for Nigerian banks.
+- research_objectives: array of 5 strings, each beginning with an action verb
+  (To examine / To assess / To investigate / To determine / To evaluate).
+- research_questions: array of 5 strings, matching the objectives.
+- research_hypotheses: array of 5 objects, each with keys "null" and "alternative".
+  Each pair must be specific and measurable (reference NPL, CAR, ROA, IFRS 9).
+- literature_review: dict with sub-keys conceptual_review, theoretical_review,
+  empirical_review. Each value is a string of 600–800 words with APA in-text
+  citations. Include Nigerian, African, and international sources. At least 40%
+  of citations must be African/Nigerian scholars or CBN/FRC publications.
+- theoretical_framework: 500–600 words. Apply Agency Theory, Signalling Theory,
+  and Stakeholder Theory to the IFRS-going concern-banking stability nexus.
+  Justify each theory with citations.
+- research_gaps: array of exactly 6 strings, each beginning "GAP N:" followed by
+  a 2–3 sentence articulation of the gap with a citation.
+- methodology: dict with sub-keys research_philosophy, research_design,
+  population_and_sampling, data_collection, model_specification,
+  analytical_techniques. model_specification must include a regression equation
+  with all variables defined. Use panel data: 10 Nigerian listed banks, 2012–2022,
+  Union Bank as focal case. Justify positivist philosophy and quantitative approach.
+- data_sources_and_variables: array of objects with keys variable, proxy,
+  source, period. Include: Going Concern (dependent), IFRS Adoption dummy,
+  IFRS 9 dummy, NPL ratio, CAR, ROA, Bank Size (log total assets), Leverage,
+  Macroeconomic controls (GDP growth, inflation).
+- references: array of minimum 35 APA 7th edition strings. Must include:
+  CBN publications, FRC Nigeria circulars, Nigerian journal articles, IASB
+  standards (IFRS 9, IFRS 7, IAS 1), ISA 570, Union Bank annual reports,
+  peer-reviewed African finance journals. Do not fabricate authors or page
+  numbers — use real, verifiable sources found in the research context.
+- appendices: object with key union_bank_financial_table containing the full
+  2015–2022 NPL/CAR/ROA/audit opinion data as a formatted string.
+
+CITATION RULES:
+- Every empirical claim → (Author, Year) or (Author et al., Year)
+- Every statistic → cite source + year
+- No unsourced assertions
+
+OUTPUT: Valid JSON only. No markdown. No preamble. No trailing text.
