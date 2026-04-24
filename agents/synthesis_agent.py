@@ -24,14 +24,14 @@ def load_research() -> dict:
     """Load and combine all research artefacts."""
     research_dir = Path("research")
 
-    exa_path = research_dir / "exa_results.json"
+    tinyfish_path = research_dir / "tinyfish_results.json"
     tavily_path = research_dir / "tavily_results.json"
     case_study_path = research_dir / "case_study_data.json"
     queries_path = research_dir / "queries.json"
 
-    exa_results = []
-    if exa_path.exists():
-        exa_results = json.loads(exa_path.read_text())[:50]
+    tinyfish_results = []
+    if tinyfish_path.exists():
+        tinyfish_results = json.loads(tinyfish_path.read_text())[:50]
 
     tavily_results = []
     if tavily_path.exists():
@@ -46,7 +46,7 @@ def load_research() -> dict:
         queries_data = json.loads(queries_path.read_text())
 
     return {
-        "exa_results": exa_results,
+        "tinyfish_results": tinyfish_results,
         "tavily_results": tavily_results,
         "case_study_data": case_study_data,
         "queries_data": queries_data,
@@ -57,20 +57,40 @@ def build_context(research: dict) -> str:
     """Build a compact context string from research data."""
     parts: list[str] = []
 
-    # Exa results
-    for i, item in enumerate(research.get("exa_results", []), start=1):
-        text_snippet = (item.get("text") or "")[:600]
-        highlights = item.get("highlights") or []
-        highlight_str = " | ".join(str(h) for h in highlights[:2])
+    # TinyFish results — include rich metadata for reference quality
+    for i, item in enumerate(research.get("tinyfish_results", []), start=1):
+        authors = item.get("authors") or []
+        author_str = ", ".join(authors[:3]) if isinstance(authors, list) else str(authors)
+        if len(authors) > 3:
+            author_str += " et al."
+
+        journal = item.get("journal_or_publisher", "")
+        doi = item.get("doi", "")
+        year = item.get("published_date", "")
+
+        text_snippet = (item.get("text") or "")[:500]
+
+        key_findings = item.get("key_findings") or item.get("highlights") or []
+        findings_str = " | ".join(str(f) for f in key_findings[:3])
+
+        gap = item.get("gap_identified", "")
+        theory = ", ".join(item.get("theory_applied") or [])
+        apa_cite = item.get("how_to_cite_apa7", "")
+
         parts.append(
-            f"[EXA-{i}] {item.get('title', '')} / {item.get('source', '')} / "
-            f"{item.get('published_date', '')} / CLUSTER:{item.get('cluster', '')} / "
-            f"{text_snippet} / HIGHLIGHTS: {highlight_str}"
+            f"[TF-{i}] {item.get('title', '')} / {item.get('source', '')} / "
+            f"AUTHORS:{author_str} / YEAR:{year} / JOURNAL:{journal} / DOI:{doi} / "
+            f"CLUSTER:{item.get('cluster', '')} / "
+            f"{text_snippet} / "
+            f"FINDINGS: {findings_str}"
+            + (f" / GAP: {gap}" if gap else "")
+            + (f" / THEORIES: {theory}" if theory else "")
+            + (f" / APA: {apa_cite}" if apa_cite else "")
         )
 
     # Tavily results
     for i, item in enumerate(research.get("tavily_results", []), start=1):
-        content_snippet = (item.get("content") or item.get("raw_content") or "")[:600]
+        content_snippet = (item.get("content") or item.get("raw_content") or "")[:500]
         parts.append(
             f"[TAV-{i}] {item.get('title', '')} / {item.get('source', '')} / "
             f"CLUSTER:{item.get('cluster', '')} / {content_snippet}"
@@ -84,7 +104,6 @@ def build_context(research: dict) -> str:
 
     # Truncate from the end if too long, but always preserve the case study data
     if len(context) > MAX_CONTEXT_CHARS:
-        # Preserve case study section at the end
         case_study_section = f"\n--- UNION BANK CASE STUDY DATA ---\n{case_study_json}"
         budget = MAX_CONTEXT_CHARS - len(case_study_section) - 200
         truncated_parts = []

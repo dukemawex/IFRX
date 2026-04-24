@@ -7,10 +7,11 @@ researches and writes a PhD-level research proposal on the topic:
 **"The Effect of International Financial Reporting Standards (IFRS) on Going Concern
 Assessment and Financial Stability in the Nigerian Banking Sector: A Case Study of
 Union Bank of Nigeria PLC (2012–2022)"**. The pipeline orchestrates six Python agents
-that decompose research queries, retrieve academic and financial data from Exa and
-Tavily, apply hardcoded Union Bank secondary data, synthesise a complete proposal via
-an OpenRouter free-tier LLM, and render the output as a formatted `.docx` Word document
-uploaded as a GitHub Actions artifact.
+that decompose research queries, retrieve academic and financial data via the
+**TinyFish** goal-directed automation API and Tavily, apply hardcoded Union Bank
+secondary data, synthesise a complete proposal via an OpenRouter free-tier LLM, and
+render the output as a formatted `.docx` Word document uploaded as a GitHub Actions
+artifact.
 
 ---
 
