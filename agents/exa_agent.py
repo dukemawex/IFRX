@@ -31,8 +31,9 @@ Output: research/tinyfish_results.json
 
 import json
 import os
-import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
+from threading import Lock
 
 import requests
 from tenacity import retry, stop_after_attempt, wait_exponential
@@ -344,7 +345,7 @@ def search_tinyfish(query: str, seed_url: str, cluster: str) -> list[dict]:
     body = {"url": seed_url, "goal": goal}
 
     response = requests.post(
-        TINYFISH_URL, headers=headers, json=body, stream=True, timeout=180
+        TINYFISH_URL, headers=headers, json=body, stream=True, timeout=90
     )
     response.raise_for_status()
 
@@ -362,40 +363,49 @@ def main() -> None:
     depth = data.get("depth", os.environ.get("RESEARCH_DEPTH", "deep"))
     seed_limit = DEPTH_SEED_LIMIT.get(depth, 3)
 
-    all_results: list[dict] = []
-    seen_urls: set[str] = set()  # for deduplication
-
+    # Build the full list of (cluster, query, seed_url) tasks
+    tasks: list[tuple[str, str, str]] = []
     for cluster_key, queries in clusters.items():
         seeds = CLUSTER_SEEDS.get(cluster_key, ["https://ssrn.com/en/"])[:seed_limit]
         print(
-            f"\n[tinyfish_agent] Cluster: {cluster_key} | "
+            f"[tinyfish_agent] Cluster: {cluster_key} | "
             f"{len(queries)} queries × {len(seeds)} seed(s) | depth={depth}"
         )
-
         for query in queries:
             for seed_url in seeds:
-                try:
-                    results = search_tinyfish(query, seed_url, cluster_key)
+                tasks.append((cluster_key, query, seed_url))
 
-                    # Deduplicate by source URL
-                    new_results = []
-                    for r in results:
-                        url = r.get("source", "")
-                        if url and url in seen_urls:
-                            continue
-                        if url:
-                            seen_urls.add(url)
-                        new_results.append(r)
+    all_results: list[dict] = []
+    seen_urls: set[str] = set()
+    results_lock = Lock()
 
-                    all_results.extend(new_results)
-                    print(
-                        f"  ✓ '{query[:55]}' @ {seed_url.split('/')[2]} "
-                        f"→ {len(new_results)} results ({len(results) - len(new_results)} dupes dropped)"
-                    )
-                except Exception as exc:
-                    print(f"  ✗ '{query[:55]}' @ {seed_url.split('/')[2]} → ERROR: {exc}")
+    def run_task(task: tuple[str, str, str]) -> None:
+        cluster_key, query, seed_url = task
+        try:
+            results = search_tinyfish(query, seed_url, cluster_key)
+            with results_lock:
+                new_results = []
+                for r in results:
+                    url = r.get("source", "")
+                    if url and url in seen_urls:
+                        continue
+                    if url:
+                        seen_urls.add(url)
+                    new_results.append(r)
+                all_results.extend(new_results)
+            print(
+                f"  ✓ '{query[:55]}' @ {seed_url.split('/')[2]} "
+                f"→ {len(new_results)} results ({len(results) - len(new_results)} dupes dropped)"
+            )
+        except Exception as exc:
+            print(f"  ✗ '{query[:55]}' @ {seed_url.split('/')[2]} → ERROR: {exc}")
 
-                time.sleep(0.5)
+    if tasks:
+        max_workers = min(6, len(tasks))
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = [executor.submit(run_task, task) for task in tasks]
+            for future in as_completed(futures):
+                future.result()  # propagate unexpected exceptions
 
     research_dir = Path("research")
     research_dir.mkdir(exist_ok=True)

@@ -27,7 +27,9 @@ written to:
 import json
 import os
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
+from threading import Lock
 
 import requests
 from tavily import TavilyClient
@@ -268,7 +270,7 @@ def deep_research(query: str, instructions: str, cluster: str) -> dict | None:
                 "instructions": instructions,
                 "max_tokens": 12000,
             },
-            timeout=180,
+            timeout=90,
         )
         if resp.ok:
             result = resp.json()
@@ -295,17 +297,25 @@ def main() -> None:
 
     all_items: list[dict] = []
     seen_urls: set[str] = set()
+    items_lock = Lock()
     research_reports: list[dict] = []
+    reports_lock = Lock()
 
+    # ── Tier 1: parallelise all searches across every cluster ─────────────────
+    # Build a flat list of (cluster_key, query, topic) tasks
+    search_tasks: list[tuple[str, str, str]] = []
     for cluster_key, queries in clusters.items():
         topic = "finance" if cluster_key in FINANCE_CLUSTERS else "general"
-
-        # ── Tier 1: search every query ────────────────────────────────────────
-        print(f"\n[tavily_agent] ── Cluster: {cluster_key} ──")
-        print(f"  Tier 1 — search ({len(queries)} queries, topic={topic})")
         for query in queries:
-            try:
-                results = search_tavily(query, topic=topic)
+            search_tasks.append((cluster_key, query, topic))
+
+    print(f"\n[tavily_agent] Tier 1 — search ({len(search_tasks)} queries across all clusters)")
+
+    def run_search(task: tuple[str, str, str]) -> None:
+        cluster_key, query, topic = task
+        try:
+            results = search_tavily(query, topic=topic)
+            with items_lock:
                 new = 0
                 for r in results:
                     r["cluster"] = cluster_key
@@ -316,15 +326,21 @@ def main() -> None:
                         seen_urls.add(url)
                     all_items.append(r)
                     new += 1
-                print(f"    ✓ '{query[:55]}' → {new} new")
-            except Exception as exc:
-                print(f"    ✗ '{query[:55]}' → ERROR: {exc}")
-            time.sleep(0.4)
+            print(f"  ✓ [{cluster_key}] '{query[:55]}' → {new} new")
+        except Exception as exc:
+            print(f"  ✗ [{cluster_key}] '{query[:55]}' → ERROR: {exc}")
 
-        # ── Tier 2: extract authoritative URLs ───────────────────────────────
+    max_search_workers = min(6, len(search_tasks)) if search_tasks else 1
+    with ThreadPoolExecutor(max_workers=max_search_workers) as executor:
+        futures = [executor.submit(run_search, task) for task in search_tasks]
+        for future in as_completed(futures):
+            future.result()
+
+    # ── Tier 2: extract authoritative URLs per cluster (sequential — small set) ─
+    for cluster_key in clusters:
         extract_targets = CLUSTER_EXTRACT_URLS.get(cluster_key, [])
         if extract_targets:
-            print(f"  Tier 2 — extract ({len(extract_targets)} URLs)")
+            print(f"\n[tavily_agent] ── Cluster: {cluster_key} ── Tier 2 — extract ({len(extract_targets)} URLs)")
             try:
                 extracted = extract_urls(extract_targets)
                 new = 0
@@ -337,26 +353,35 @@ def main() -> None:
                         seen_urls.add(url)
                     all_items.append(r)
                     new += 1
-                print(f"    ✓ Extracted {new} pages")
+                print(f"  ✓ Extracted {new} pages")
             except Exception as exc:
-                print(f"    ✗ Extract failed: {exc}")
+                print(f"  ✗ Extract failed: {exc}")
             time.sleep(0.5)
 
-        # ── Tier 3: deep research ─────────────────────────────────────────────
+    # ── Tier 3: parallelise deep research across all clusters ─────────────────
+    print(f"\n[tavily_agent] Tier 3 — deep research ({len(clusters)} clusters in parallel)")
+
+    def run_deep_research(cluster_key: str) -> None:
         rc = CLUSTER_RESEARCH.get(cluster_key)
-        if rc:
-            print(f"  Tier 3 — deep research")
-            try:
-                report = deep_research(rc["query"], rc["instructions"], cluster_key)
-                if report:
+        if not rc:
+            return
+        try:
+            report = deep_research(rc["query"], rc["instructions"], cluster_key)
+            if report:
+                with reports_lock:
                     research_reports.append(report)
-                    sources = report.get("sources") or report.get("results") or []
-                    print(f"    ✓ Report received ({len(str(report))} chars, {len(sources)} sources)")
-                else:
-                    print(f"    ✗ Research returned empty result")
-            except Exception as exc:
-                print(f"    ✗ Deep research failed: {exc}")
-            time.sleep(1.0)
+                sources = report.get("sources") or report.get("results") or []
+                print(f"  ✓ [{cluster_key}] Report received ({len(str(report))} chars, {len(sources)} sources)")
+            else:
+                print(f"  ✗ [{cluster_key}] Research returned empty result")
+        except Exception as exc:
+            print(f"  ✗ [{cluster_key}] Deep research failed: {exc}")
+
+    max_research_workers = min(3, len(clusters)) if clusters else 1
+    with ThreadPoolExecutor(max_workers=max_research_workers) as executor:
+        futures = [executor.submit(run_deep_research, ck) for ck in clusters]
+        for future in as_completed(futures):
+            future.result()
 
     research_dir = Path("research")
     research_dir.mkdir(exist_ok=True)
