@@ -345,7 +345,7 @@ def search_tinyfish(query: str, seed_url: str, cluster: str) -> list[dict]:
     body = {"url": seed_url, "goal": goal}
 
     response = requests.post(
-        TINYFISH_URL, headers=headers, json=body, stream=True, timeout=(15, 45)
+        TINYFISH_URL, headers=headers, json=body, stream=True, timeout=(15, 20)
     )
     response.raise_for_status()
 
@@ -403,9 +403,9 @@ def main() -> None:
     if tasks:
         max_workers = min(6, len(tasks))
         # Hard wall-clock deadline derived from an env variable so it can be
-        # tuned without touching this file.  Default: 45 minutes, which fits
-        # comfortably inside the workflow's timeout-minutes: 60 budget.
-        AGENT_TIMEOUT_SECONDS = int(os.environ.get("TINYFISH_TIMEOUT_SECONDS", str(45 * 60)))
+        # tuned without touching this file.  Default: 10 minutes, which fits
+        # comfortably inside the workflow's timeout-minutes: 15 budget.
+        AGENT_TIMEOUT_SECONDS = int(os.environ.get("TINYFISH_TIMEOUT_SECONDS", str(10 * 60)))
         completed_count = 0
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             futures = [executor.submit(run_task, task) for task in tasks]
