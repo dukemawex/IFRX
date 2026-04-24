@@ -201,7 +201,7 @@ def build_document(proposal: dict, case_study: dict) -> Document:
                 _set_font(run_h, bold=True)
                 null_run = p.add_run(f"H₀: {hyp.get('null', '')}  ")
                 _set_font(null_run)
-                alt_run = p.add_run(f"Hₐ: {hyp.get('alternate', '')}")
+                alt_run = p.add_run(f"Hₐ: {hyp.get('alternative', hyp.get('alternate', ''))}")
                 _set_font(alt_run)
             else:
                 _body(doc, str(hyp))

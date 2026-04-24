@@ -17,7 +17,7 @@ CONTENT REQUIREMENTS:
 - research_objectives: array of 5 strings, each beginning with an action verb
   (To examine / To assess / To investigate / To determine / To evaluate).
 - research_questions: array of 5 strings, matching the objectives.
-- research_hypotheses: array of 5 objects, each with keys "null" and "alternate".
+- research_hypotheses: array of 5 objects, each with keys "null" and "alternative".
   Each pair must be specific and measurable (reference NPL, CAR, ROA, IFRS 9).
 - literature_review: dict with sub-keys conceptual_review, theoretical_review,
   empirical_review. Each value is a string of 600–800 words with APA in-text
