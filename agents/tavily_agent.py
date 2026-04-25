@@ -251,7 +251,7 @@ def deep_research(query: str, instructions: str, cluster: str) -> dict | None:
     # ── Try SDK method (available in tavily-python >= 0.5.x) ─────────────────
     if hasattr(client, "research"):
         try:
-            result = client.research(query=query, instructions=instructions)
+            result = client.research(query, instructions=instructions)
             if result:
                 result["cluster"] = cluster
                 result["tier"] = "research"
@@ -266,7 +266,7 @@ def deep_research(query: str, instructions: str, cluster: str) -> dict | None:
             TAVILY_RESEARCH_URL,
             json={
                 "api_key": api_key,
-                "query": query,
+                "input": query,
                 "instructions": instructions,
                 "max_tokens": 12000,
             },
