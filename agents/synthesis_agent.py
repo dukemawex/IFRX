@@ -197,7 +197,34 @@ def call_openrouter(
         )
 
     data = response.json()
-    return data["choices"][0]["message"]["content"]
+
+    # OpenRouter may return a 200 with an error body (e.g. context-length exceeded,
+    # quota exhausted, or an upstream provider error).
+    if "error" in data:
+        err = data["error"]
+        raise RuntimeError(
+            f"OpenRouter returned an error in the response body "
+            f"(HTTP {response.status_code}, model={payload['model']}): {err}"
+        )
+
+    choices = data.get("choices")
+    if not choices:
+        raise RuntimeError(
+            f"OpenRouter response contained no choices "
+            f"(HTTP {response.status_code}, model={payload['model']}). "
+            f"Full response: {data}"
+        )
+
+    message = choices[0].get("message", {})
+    content = message.get("content")
+    if not content:
+        raise RuntimeError(
+            f"OpenRouter choice[0] has no 'content' field "
+            f"(HTTP {response.status_code}, model={payload['model']}). "
+            f"Choice: {choices[0]}"
+        )
+
+    return content
 
 
 def main() -> None:
