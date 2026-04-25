@@ -182,9 +182,9 @@ def call_openrouter(
             OPENROUTER_BASE, headers=headers, json=payload, timeout=120
         )
 
-    if response.status_code == 503 and model == PRIMARY_MODEL:
+    if response.status_code in (404, 503) and model == PRIMARY_MODEL:
         print(
-            f"[synthesis_agent] HTTP 503 on primary model — switching to {FALLBACK_MODEL}"
+            f"[synthesis_agent] HTTP {response.status_code} on primary model — switching to {FALLBACK_MODEL}"
         )
         payload["model"] = FALLBACK_MODEL
         response = requests.post(
