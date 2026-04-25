@@ -9,22 +9,12 @@ import json
 import os
 import re
 import sys
-import time
 from pathlib import Path
 
 import requests
 
 OPENROUTER_BASE = "https://openrouter.ai/api/v1/chat/completions"
-FREE_MODELS = [
-    "meta-llama/llama-3.3-70b-instruct:free",
-    "meta-llama/llama-3.1-8b-instruct:free",
-    "mistralai/mistral-small-3.2-24b-instruct:free",
-    "google/gemma-3-27b-it:free",
-    "deepseek/deepseek-r1-0528:free",
-    "openrouter/free",  # OpenRouter free model router — routes to best available free model
-    "openrouter/auto",  # last-resort: OpenRouter picks best available model
-]
-PRIMARY_MODEL = FREE_MODELS[0]
+OPENROUTER_MODEL = "openrouter/openrouter/free"
 
 MAX_CONTEXT_CHARS = 28_000  # ~8k tokens safety threshold
 
@@ -157,18 +147,9 @@ def build_context(research: dict) -> str:
 def call_openrouter(
     system_prompt: str,
     user_message: str,
-    model_list: list | None = None,
     max_tokens: int = 8000,
 ) -> str:
-    """POST to OpenRouter and return the assistant message content.
-
-    Iterates through *model_list* (defaults to FREE_MODELS) and retries with
-    the next model on 404 (model not found) or 529 (rate-limited/unavailable).
-    Raises RuntimeError when the list is exhausted.
-    """
-    if model_list is None:
-        model_list = list(FREE_MODELS)
-
+    """POST to OpenRouter and return the assistant message content."""
     api_key = os.environ["OPENROUTER_API_KEY"]
     headers = {
         "Authorization": f"Bearer {api_key}",
@@ -177,35 +158,18 @@ def call_openrouter(
         "X-Title": "IFRS-PhD-Proposal-Generator",
     }
 
-    for model in model_list:
-        print(f"[synthesis_agent] Trying model: {model}")
-        payload = {
-            "model": model,
-            "max_tokens": max_tokens,
-            "stream": False,
-            "messages": [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_message},
-            ],
-        }
+    payload = {
+        "model": OPENROUTER_MODEL,
+        "max_tokens": max_tokens,
+        "stream": False,
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_message},
+        ],
+    }
 
-        # Rate-limit pause before every call
-        time.sleep(2)
-
+    try:
         response = requests.post(OPENROUTER_BASE, headers=headers, json=payload, timeout=120)
-
-        if response.status_code == 429:
-            print("[synthesis_agent] HTTP 429 — waiting 60 seconds before retry...")
-            time.sleep(60)
-            response = requests.post(
-                OPENROUTER_BASE, headers=headers, json=payload, timeout=120
-            )
-
-        if response.status_code in (404, 503, 529):
-            print(
-                f"[synthesis_agent] HTTP {response.status_code} on {model} — trying next model..."
-            )
-            continue
 
         if not response.ok:
             raise RuntimeError(
@@ -214,35 +178,31 @@ def call_openrouter(
 
         data = response.json()
 
-        # OpenRouter may return a 200 with an error body (e.g. context-length exceeded,
-        # quota exhausted, or an upstream provider error).
         if "error" in data:
-            err = data["error"]
             raise RuntimeError(
                 f"OpenRouter returned an error in the response body "
-                f"(HTTP {response.status_code}, model={model}): {err}"
+                f"(HTTP {response.status_code}): {data['error']}"
             )
 
         choices = data.get("choices")
         if not choices:
             raise RuntimeError(
                 f"OpenRouter response contained no choices "
-                f"(HTTP {response.status_code}, model={model}). "
-                f"Full response: {data}"
+                f"(HTTP {response.status_code}). Full response: {data}"
             )
 
-        message = choices[0].get("message", {})
-        content = message.get("content")
+        content = choices[0].get("message", {}).get("content")
         if not content:
             raise RuntimeError(
                 f"OpenRouter choice[0] has no 'content' field "
-                f"(HTTP {response.status_code}, model={model}). "
-                f"Choice: {choices[0]}"
+                f"(HTTP {response.status_code}). Choice: {choices[0]}"
             )
 
         return content
-
-    raise RuntimeError("All OpenRouter free models exhausted or unavailable.")
+    except RuntimeError:
+        raise
+    except Exception as exc:
+        raise RuntimeError(f"OpenRouter request failed: {exc}") from exc
 
 
 def main() -> None:
@@ -274,10 +234,10 @@ def main() -> None:
         f"[synthesis_agent] Sources loaded: "
         f"Tavily={tav_count}, DeepResearch={deep_count}. "
         f"Context: {len(user_message)} chars. "
-        f"Calling OpenRouter (primary: {PRIMARY_MODEL})..."
+        f"Calling OpenRouter ({OPENROUTER_MODEL})..."
     )
 
-    raw = call_openrouter(system_prompt, user_message, model_list=list(FREE_MODELS))
+    raw = call_openrouter(system_prompt, user_message)
 
     # Strip accidental markdown code fences
     cleaned = re.sub(r"^```(?:json)?\s*", "", raw.strip(), flags=re.IGNORECASE)
