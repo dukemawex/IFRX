@@ -227,24 +227,25 @@ def _try_live_enrichment(baseline: dict) -> tuple[dict, list[str], str]:
 
     # ── Extract authoritative pages ───────────────────────────────────────────
     print("[case_study_agent] Tier 2 — extracting live pages...")
-    try:
-        extract_resp = client.extract(urls=LIVE_EXTRACT_URLS)
-        for item in extract_resp.get("results", []):
-            url = item.get("url", "")
-            raw = item.get("raw_content", "") or ""
-            if raw and url:
-                live_sources.append(url)
-                live_snippets.append({
-                    "url": url,
-                    "content": raw[:6000],
-                    "type": "extract",
-                })
-                print(f"  ✓ Extracted {len(raw)} chars from {url}")
-        for failed in extract_resp.get("failed_results", []):
-            print(f"  ✗ Extract failed: {failed.get('url', '')} — {failed.get('error', '')}")
-    except Exception as exc:
-        print(f"  ✗ Extract error: {exc}")
-    time.sleep(0.5)
+    for url in LIVE_EXTRACT_URLS:
+        try:
+            extract_resp = client.extract(urls=[url])
+            for item in extract_resp.get("results", []):
+                item_url = item.get("url", url)
+                raw = item.get("raw_content", "") or ""
+                if raw and item_url:
+                    live_sources.append(item_url)
+                    live_snippets.append({
+                        "url": item_url,
+                        "content": raw[:6000],
+                        "type": "extract",
+                    })
+                    print(f"  ✓ Extracted {len(raw)} chars from {item_url}")
+            for failed in extract_resp.get("failed_results", []):
+                print(f"  ✗ Extract failed: {failed.get('url', '')} — {failed.get('error', '')}")
+        except Exception as exc:
+            print(f"  ✗ Extract error for {url}: {exc}")
+        time.sleep(0.3)
 
     # ── Search for specific financial data ────────────────────────────────────
     print("[case_study_agent] Tier 1 — searching for live financial data...")

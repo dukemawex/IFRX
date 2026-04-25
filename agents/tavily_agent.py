@@ -216,15 +216,14 @@ def search_tavily(query: str, topic: str = "general") -> list[dict]:
 # ── Tier 2: URL extraction ────────────────────────────────────────────────────
 
 @retry(stop=stop_after_attempt(2), wait=wait_exponential(min=3, max=15))
-def extract_urls(urls: list[str]) -> list[dict]:
-    """Extract full content from specific authoritative URLs."""
-    response = client.extract(urls=urls)
-    results = []
+def _extract_single_url(url: str) -> dict | None:
+    """Extract full content from a single URL. Returns None on failure."""
+    response = client.extract(urls=[url])
     for item in response.get("results", []):
         raw = item.get("raw_content") or ""
-        results.append({
-            "source": item.get("url", ""),
-            "title": item.get("url", "").split("/")[-1] or item.get("url", ""),
+        return {
+            "source": item.get("url", url),
+            "title": item.get("url", url).split("/")[-1] or item.get("url", url),
             "content": raw[:800],
             "raw_content": raw[:6000],
             "score": 1.0,
@@ -232,9 +231,22 @@ def extract_urls(urls: list[str]) -> list[dict]:
             "answer_snippet": "",
             "tier": "extract",
             "agent": "tavily",
-        })
+        }
     for failed in response.get("failed_results", []):
         print(f"  [extract] Failed: {failed.get('url', '')} — {failed.get('error', '')}")
+    return None
+
+
+def extract_urls(urls: list[str]) -> list[dict]:
+    """Extract full content from specific authoritative URLs, one at a time."""
+    results = []
+    for url in urls:
+        try:
+            item = _extract_single_url(url)
+            if item:
+                results.append(item)
+        except Exception as exc:
+            print(f"  [extract] Failed: {url} — {exc}")
     return results
 
 
