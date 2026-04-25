@@ -203,20 +203,25 @@ def call_openrouter(
     if "error" in data:
         err = data["error"]
         raise RuntimeError(
-            f"OpenRouter returned an error in the response body: {err}"
+            f"OpenRouter returned an error in the response body "
+            f"(HTTP {response.status_code}, model={payload['model']}): {err}"
         )
 
     choices = data.get("choices")
     if not choices:
         raise RuntimeError(
-            f"OpenRouter response contained no choices. Full response: {data}"
+            f"OpenRouter response contained no choices "
+            f"(HTTP {response.status_code}, model={payload['model']}). "
+            f"Full response: {data}"
         )
 
     message = choices[0].get("message", {})
     content = message.get("content")
-    if content is None:
+    if not content:
         raise RuntimeError(
-            f"OpenRouter choice[0] has no 'content' field. Choice: {choices[0]}"
+            f"OpenRouter choice[0] has no 'content' field "
+            f"(HTTP {response.status_code}, model={payload['model']}). "
+            f"Choice: {choices[0]}"
         )
 
     return content
