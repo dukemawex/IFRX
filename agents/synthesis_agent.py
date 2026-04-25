@@ -21,7 +21,8 @@ FREE_MODELS = [
     "mistralai/mistral-small-3.2-24b-instruct:free",
     "google/gemma-3-27b-it:free",
     "deepseek/deepseek-r1-0528:free",
-    "openrouter/auto",  # last-resort: OpenRouter picks best available free model
+    "openrouter/free",  # OpenRouter free model router — routes to best available free model
+    "openrouter/auto",  # last-resort: OpenRouter picks best available model
 ]
 PRIMARY_MODEL = FREE_MODELS[0]
 
