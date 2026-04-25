@@ -14,7 +14,7 @@ from pathlib import Path
 import requests
 
 OPENROUTER_BASE = "https://openrouter.ai/api/v1/chat/completions"
-OPENROUTER_MODEL = "openrouter/openrouter/free"
+OPENROUTER_MODEL = "openrouter/free"
 
 MAX_CONTEXT_CHARS = 28_000  # ~8k tokens safety threshold
 
