@@ -41,6 +41,18 @@ QUERY_PLAN = {
         "non-performing loan ratio capital adequacy ratio UBN 2018 2023",
         "IFRS 9 transition impact Union Bank Nigeria opening equity adjustment",
         "Titan Trust Bank acquisition Union Bank Nigeria 2022 change of control",
+        "Union Bank Nigeria excess loan loss provision IFRS 9 transition 2018",
+        "Union Bank Nigeria credit impairment charges income statement 2018 2022",
+    ],
+    "ecl_excess_credit_loss": [
+        "IFRS 9 expected credit loss ECL Nigerian banks empirical evidence",
+        "excess credit loss provisions bank profitability Africa",
+        "ECL model IFRS 9 procyclicality developing countries banking",
+        "loan impairment IFRS 9 vs IAS 39 Nigerian commercial banks comparison",
+        "expected credit loss going concern opinion bank auditors Nigeria",
+        "IFRS 9 stage 1 stage 2 stage 3 classification Nigerian bank loans",
+        "credit loss provisioning bank capital adequacy ratio Nigeria panel data",
+        "Union Bank Nigeria loan impairment provisions 2018 2022 IFRS 9 ECL",
     ],
     "literature_gaps": [
         "research gaps IFRS going concern banking Nigeria empirical studies",

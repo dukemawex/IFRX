@@ -13,7 +13,7 @@ from pathlib import Path
 
 import requests
 from docx import Document
-from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_LINE_SPACING
 from docx.shared import Inches, Pt, RGBColor
 
 OPENROUTER_BASE = "https://openrouter.ai/api/v1/chat/completions"
@@ -235,31 +235,33 @@ def _run(para, text: str, size=None, bold: bool = False, italic: bool = False,
 def _chapter_heading(doc: Document, text: str) -> None:
     p = doc.add_paragraph()
     p.paragraph_format.space_before = Pt(18)
-    p.paragraph_format.space_after = Pt(10)
-    _run(p, text, size=_HEAD1_PT, bold=True, color=_HEADING_COLOR)
+    p.paragraph_format.space_after = Pt(12)
+    _run(p, text, size=Pt(14), bold=True, color=_HEADING_COLOR)
 
 
 def _section_heading(doc: Document, text: str) -> None:
     p = doc.add_paragraph()
     p.paragraph_format.space_before = Pt(12)
     p.paragraph_format.space_after = Pt(6)
-    _run(p, text, size=_HEAD2_PT, bold=True, color=_HEADING_COLOR)
+    _run(p, text, size=Pt(12), bold=True, color=_HEADING_COLOR)
 
 
 def _sub_heading(doc: Document, text: str) -> None:
-    """Italic subsection label (e.g. Case Illustration)."""
+    """Sub-subsection label (e.g. 2.1.1)."""
     p = doc.add_paragraph()
     p.paragraph_format.space_before = Pt(10)
     p.paragraph_format.space_after = Pt(4)
-    _run(p, text, size=_HEAD3_PT, bold=True, italic=True, color=_HEADING_COLOR)
+    _run(p, text, size=Pt(11), bold=True, italic=True, color=_HEADING_COLOR)
 
 
 def _body(doc: Document, text: str) -> None:
     if not text:
         return
     p = doc.add_paragraph()
-    p.paragraph_format.space_after = Pt(6)
-    _run(p, str(text).strip())
+    p.paragraph_format.space_after = Pt(12)
+    p.paragraph_format.line_spacing_rule = WD_LINE_SPACING.MULTIPLE
+    p.paragraph_format.line_spacing = 1.5
+    _run(p, _enforce_ub_scope(str(text).strip()))
 
 
 def _table_header(table, headers: list[str]) -> None:
@@ -286,14 +288,64 @@ def _split_paragraphs(text: str) -> list[str]:
     return [p.strip() for p in re.split(r"\n{2,}", text.strip()) if p.strip()]
 
 
+# ── Scope-enforcement substitutions ──────────────────────────────────────────
+# Replace any multi-bank / panel-study framing that may survive in the JSON
+# with Union-Bank-only language, keeping the study as a single-entity case study.
+
+_SCOPE_PATTERNS: list[tuple[re.Pattern, str]] = [
+    # explicit "N listed Nigerian banks" and close variants
+    (re.compile(r"\b\d+\s+listed\s+(?:Nigerian\s+)?banks?\b", re.IGNORECASE),
+     "Union Bank of Nigeria PLC"),
+    # "listed deposit money banks" (NDIC/CBN terminology for the broader sector)
+    (re.compile(r"\blisted\s+deposit\s+money\s+banks?\b", re.IGNORECASE),
+     "Union Bank of Nigeria PLC"),
+    # "panel data across/of/from/for multiple banks" → longitudinal framing
+    (re.compile(
+        r"\bpanel\s+data\s+(?:across|of|from|for)\s+(?:multiple\s+)?(?:listed\s+)?banks?\b",
+        re.IGNORECASE),
+     "longitudinal data for Union Bank of Nigeria PLC"),
+    # residual "multiple banks"
+    (re.compile(r"\bmultiple\s+banks?\b", re.IGNORECASE),
+     "Union Bank of Nigeria PLC"),
+    # sector-wide / panel study framing
+    (re.compile(r"\bsector-?wide\s+panel\s+study\b", re.IGNORECASE),
+     "single-entity longitudinal case study"),
+    (re.compile(r"\bpanel\s+data\s+analysis\b", re.IGNORECASE),
+     "longitudinal data analysis"),
+    # bare "panel data" where it implies multi-entity framing
+    (re.compile(r"\bpanel\s+data\b", re.IGNORECASE),
+     "longitudinal data"),
+    # "panel study" / "panel research"
+    (re.compile(r"\bpanel\s+(?:study|research)\b", re.IGNORECASE),
+     "longitudinal case study"),
+    # "population of … banks" → sole population = Union Bank
+    (re.compile(
+        r"\bpopulation\s+of\s+(?:all\s+)?(?:\d+\s+)?(?:listed\s+)?(?:Nigerian\s+)?(?:commercial\s+)?banks?\b",
+        re.IGNORECASE),
+     "Union Bank of Nigeria PLC as the sole unit of analysis"),
+    # "sampled banks" / "selected banks" / "the banks"
+    (re.compile(r"\b(?:sampled|selected)\s+banks?\b", re.IGNORECASE),
+     "Union Bank of Nigeria PLC"),
+]
+
+
+def _enforce_ub_scope(text: str) -> str:
+    """Replace multi-bank / panel-study framing with Union Bank of Nigeria PLC."""
+    for pattern, replacement in _SCOPE_PATTERNS:
+        text = pattern.sub(replacement, text)
+    return text
+
+
 def _add_with_union_bank_treatment(doc: Document, text: str) -> None:
     """
     Emit body paragraphs.  Any paragraph that mentions Union Bank is preceded
     by a 'Case Illustration: Union Bank of Nigeria PLC' subsection heading.
+    Scope enforcement is applied before the Union Bank check so that converted
+    multi-bank references are also treated as Union Bank paragraphs.
     """
     if not text:
         return
-    paragraphs = _split_paragraphs(str(text))
+    paragraphs = _split_paragraphs(_enforce_ub_scope(str(text)))
     in_ub_block = False
     for para in paragraphs:
         is_ub = bool(re.search(r"\bunion\s+bank\b", para, re.IGNORECASE))
@@ -302,6 +354,8 @@ def _add_with_union_bank_treatment(doc: Document, text: str) -> None:
             in_ub_block = True
         elif not is_ub:
             in_ub_block = False
+        # _body also calls _enforce_ub_scope; the function is idempotent so
+        # double-application is harmless and provides defensive coverage.
         _body(doc, para)
 
 
@@ -505,14 +559,101 @@ def _add_ub_narrative_note(doc: Document, raw) -> None:
     _body(doc, para)
 
 
+def _render_gaps(doc: Document, gaps) -> None:
+    """Render research gap items with bold 'GAP N:' prefix."""
+    if isinstance(gaps, list):
+        for gap in gaps:
+            gap_str = str(gap).strip()
+            p = doc.add_paragraph()
+            p.paragraph_format.space_after = Pt(12)
+            p.paragraph_format.line_spacing_rule = WD_LINE_SPACING.MULTIPLE
+            p.paragraph_format.line_spacing = 1.5
+            colon_idx = gap_str.find(":") if gap_str.upper().startswith("GAP") else -1
+            if colon_idx != -1:
+                _run(p, gap_str[: colon_idx + 1], bold=True)
+                _run(p, gap_str[colon_idx + 1:])
+            else:
+                _run(p, gap_str)
+    else:
+        _body(doc, str(gaps))
+
+
+def _render_hypotheses(doc: Document, hypotheses) -> None:
+    """Render H0N/HNA labelled pairs."""
+    if isinstance(hypotheses, list):
+        for i, hyp in enumerate(hypotheses, start=1):
+            if isinstance(hyp, dict):
+                p = doc.add_paragraph()
+                p.paragraph_format.space_after = Pt(2)
+                _run(p, f"H0{i}: ", bold=True)
+                _run(p, _enforce_ub_scope(str(hyp.get("null", ""))))
+                p2 = doc.add_paragraph()
+                p2.paragraph_format.space_after = Pt(8)
+                _run(p2, f"H{i}A: ", bold=True)
+                alt = hyp.get("alternative") or hyp.get("alternate", "")
+                _run(p2, _enforce_ub_scope(str(alt)))
+            else:
+                _body(doc, str(hyp))
+    else:
+        _body(doc, str(hypotheses))
+
+
+def _render_numbered_list(doc: Document, items) -> None:
+    """Render a numbered list with scope enforcement."""
+    if isinstance(items, list):
+        for i, item in enumerate(items, start=1):
+            p = doc.add_paragraph()
+            p.paragraph_format.left_indent = Inches(0.25)
+            p.paragraph_format.space_after = Pt(6)
+            _run(p, f"{i}. {_enforce_ub_scope(str(item))}")
+    else:
+        _body(doc, str(items))
+
+
+def _render_terms(doc: Document, terms) -> None:
+    """Render operational definition of terms dict."""
+    if isinstance(terms, dict):
+        for term, definition in terms.items():
+            p = doc.add_paragraph()
+            p.paragraph_format.space_after = Pt(6)
+            p.paragraph_format.line_spacing_rule = WD_LINE_SPACING.MULTIPLE
+            p.paragraph_format.line_spacing = 1.5
+            _run(p, f"{term}: ", bold=True)
+            _run(p, str(definition).strip())
+    elif terms:
+        _body(doc, str(terms))
+
+
+def _render_var_table(doc: Document, variables) -> None:
+    """Render the variable operationalisation table."""
+    if isinstance(variables, list) and variables:
+        headers = ["Variable", "Proxy Measure", "Data Source", "Time Period"]
+        table = doc.add_table(rows=1, cols=len(headers))
+        table.style = "Table Grid"
+        _table_header(table, headers)
+        for var in variables:
+            if isinstance(var, dict):
+                _table_row(table, [
+                    var.get("variable", ""), var.get("proxy", ""),
+                    var.get("source", ""), var.get("period", ""),
+                ])
+            else:
+                _table_row(table, [str(var), "", "", ""])
+        doc.add_paragraph()
+    else:
+        _body(doc, str(variables))
+
+
 def format_dissertation(proposal: dict) -> Document:
     """
     Transform a raw JSON research proposal into a fully structured,
     publication-ready PhD dissertation as a python-docx Document.
+    Consumes the nested chapter_one / chapter_two / chapter_three JSON structure.
+    Falls back to old flat-key structure for backward compatibility.
     """
     doc = Document()
 
-    # Global margin and default font
+    # ── Global margins and default font ───────────────────────────────────────
     for section in doc.sections:
         section.left_margin = Inches(1.25)
         section.right_margin = Inches(1.25)
@@ -522,15 +663,31 @@ def format_dissertation(proposal: dict) -> Document:
     style.font.name = _FONT_NAME
     style.font.size = _BODY_PT
 
+    # ── Nested chapter accessors with flat-key fallback ───────────────────────
+    ch1 = proposal.get("chapter_one") or {}
+    ch2 = proposal.get("chapter_two") or {}
+    ch3 = proposal.get("chapter_three") or {}
+    _old_lit = proposal.get("literature_review") or {}
+    _old_meth = proposal.get("methodology") or {}
+
+    _bg    = ch1.get("background_to_study") or proposal.get("introduction", "")
+    _sop   = ch1.get("statement_of_problem") or proposal.get("statement_of_problem", "")
+    _obj   = ch1.get("research_objectives") or proposal.get("research_objectives", [])
+    _qs    = ch1.get("research_questions") or proposal.get("research_questions", [])
+    _hyp   = ch1.get("research_hypotheses") or proposal.get("research_hypotheses", [])
+    _sig   = ch1.get("significance_of_study") or proposal.get("significance_of_study", "")
+    _scope = ch1.get("scope_and_delimitation") or proposal.get("scope_and_delimitation", "")
+    _terms = ch1.get("operational_definition_of_terms") or {}
+
     # ── Cover Page ────────────────────────────────────────────────────────────
     cover = proposal.get("cover_page", {})
     if isinstance(cover, dict):
-        title = cover.get("title", "")
-        author = cover.get("author", "")
+        title      = cover.get("title", "")
+        author     = cover.get("author", "")
         institution = cover.get("institution", "")
-        department = cover.get("department", "")
-        supervisor = cover.get("supervisor", "")
-        date = cover.get("date", "")
+        department  = cover.get("department", "")
+        supervisor  = cover.get("supervisor", "")
+        date        = cover.get("date", "")
     else:
         title = str(cover) if cover else ""
         author = institution = department = supervisor = date = ""
@@ -540,8 +697,8 @@ def format_dissertation(proposal: dict) -> Document:
 
     title_p = doc.add_paragraph()
     title_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    _run(title_p, title or "PhD Research Proposal", size=_TITLE_PT, bold=True,
-         color=_HEADING_COLOR)
+    _run(title_p, title or "PhD Research Proposal", size=_TITLE_PT,
+         bold=True, color=_HEADING_COLOR)
 
     for field in [author, institution, department]:
         if field:
@@ -557,163 +714,143 @@ def format_dissertation(proposal: dict) -> Document:
         p.alignment = WD_ALIGN_PARAGRAPH.CENTER
         _run(p, date)
 
+    # ── CHAPTER ONE: INTRODUCTION ─────────────────────────────────────────────
     doc.add_page_break()
+    _chapter_heading(doc, "CHAPTER ONE \u2014 INTRODUCTION")
 
-    # ── Abstract ──────────────────────────────────────────────────────────────
-    _chapter_heading(doc, "ABSTRACT")
-    _body(doc, proposal.get("abstract", ""))
-    doc.add_page_break()
+    _section_heading(doc, "1.1 Background to the Study")
+    _add_with_union_bank_treatment(doc, str(_bg))
 
-    # ── Chapter One: Introduction ─────────────────────────────────────────────
-    _chapter_heading(doc, "CHAPTER ONE: INTRODUCTION")
-    _add_with_union_bank_treatment(doc, str(proposal.get("introduction", "")))
-
-    # 1.2 Statement of the Problem
     _section_heading(doc, "1.2 Statement of the Problem")
-    _add_with_union_bank_treatment(doc, str(proposal.get("statement_of_problem", "")))
+    _add_with_union_bank_treatment(doc, str(_sop))
 
-    # 1.3 Research Objectives
     _section_heading(doc, "1.3 Research Objectives")
-    objectives = proposal.get("research_objectives", [])
-    if isinstance(objectives, list):
-        for i, obj in enumerate(objectives, start=1):
-            p = doc.add_paragraph()
-            p.paragraph_format.left_indent = Inches(0.25)
-            p.paragraph_format.space_after = Pt(4)
-            _run(p, f"{i}. {obj}")
-    else:
-        _body(doc, str(objectives))
+    _render_numbered_list(doc, _obj)
 
-    # 1.4 Research Questions
     _section_heading(doc, "1.4 Research Questions")
-    questions = proposal.get("research_questions", [])
-    if isinstance(questions, list):
-        for i, q in enumerate(questions, start=1):
-            p = doc.add_paragraph()
-            p.paragraph_format.left_indent = Inches(0.25)
-            p.paragraph_format.space_after = Pt(4)
-            _run(p, f"{i}. {q}")
-    else:
-        _body(doc, str(questions))
+    _render_numbered_list(doc, _qs)
 
-    # 1.5 Research Hypotheses — H0N (null) / HNA (alternative) labelled pairs
     _section_heading(doc, "1.5 Research Hypotheses")
-    hypotheses = proposal.get("research_hypotheses", [])
-    if isinstance(hypotheses, list):
-        for i, hyp in enumerate(hypotheses, start=1):
-            if isinstance(hyp, dict):
-                p = doc.add_paragraph()
-                p.paragraph_format.space_after = Pt(2)
-                _run(p, f"H0{i}: ", bold=True)
-                _run(p, str(hyp.get("null", "")))
-                p2 = doc.add_paragraph()
-                p2.paragraph_format.space_after = Pt(6)
-                _run(p2, f"H{i}A: ", bold=True)
-                alt = hyp.get("alternative") or hyp.get("alternate", "")
-                _run(p2, str(alt))
-            else:
-                _body(doc, str(hyp))
-    else:
-        _body(doc, str(hypotheses))
+    _render_hypotheses(doc, _hyp)
 
-    # 1.6 Significance of the Study
     _section_heading(doc, "1.6 Significance of the Study")
-    _body(doc, str(proposal.get("significance_of_study", "")))
+    _body(doc, str(_sig))
 
-    # 1.7 Scope and Delimitation
-    _section_heading(doc, "1.7 Scope and Delimitation")
-    _body(doc, str(proposal.get("scope_and_delimitation", "")))
+    _section_heading(doc, "1.7 Scope and Delimitation of the Study")
+    _body(doc, str(_scope))
+
+    _section_heading(doc, "1.8 Operational Definition of Terms")
+    _render_terms(doc, _terms)
+
+    # ── CHAPTER TWO: LITERATURE REVIEW ───────────────────────────────────────
     doc.add_page_break()
+    _chapter_heading(doc, "CHAPTER TWO \u2014 LITERATURE REVIEW")
 
-    # ── Chapter Two: Literature Review ────────────────────────────────────────
-    _chapter_heading(doc, "CHAPTER TWO: LITERATURE REVIEW")
-    lit_review = proposal.get("literature_review", {})
-    lit_sub_map = [
-        ("conceptual_review", "2.1 Conceptual Review"),
-        ("theoretical_review", "2.2 Theoretical Review"),
-        ("empirical_review", "2.3 Empirical Review"),
-    ]
-    if isinstance(lit_review, dict):
-        for key, heading in lit_sub_map:
-            if key in lit_review:
-                _section_heading(doc, heading)
-                _body(doc, str(lit_review[key]))
+    # 2.1 Conceptual Review
+    _section_heading(doc, "2.1 Conceptual Review")
+    conceptual = ch2.get("conceptual_review") or {}
+    if isinstance(conceptual, dict) and conceptual:
+        _sub_heading(doc, "2.1.1 IFRS: Concept, Adoption and Framework")
+        _body(doc, str(conceptual.get("ifrs_concept_adoption", "")))
+        _sub_heading(doc, "2.1.2 Going Concern: Concept and Regulatory Basis")
+        _body(doc, str(conceptual.get("going_concern_concept", "")))
+        _sub_heading(doc, "2.1.3 Banking Sector Stability: Measures and Determinants")
+        _body(doc, str(conceptual.get("banking_stability", "")))
+        _sub_heading(doc, "2.1.4 Expected Credit Loss (ECL) under IFRS 9")
+        _body(doc, str(conceptual.get("expected_credit_loss_ifrs9", "")))
     else:
-        _body(doc, str(lit_review))
+        _body(doc, str(conceptual or _old_lit.get("conceptual_review", "")))
 
-    # 2.4 Theoretical Framework
-    _section_heading(doc, "2.4 Theoretical Framework")
-    _body(doc, str(proposal.get("theoretical_framework", "")))
-
-    # 2.5 Research Gaps
-    _section_heading(doc, "2.5 Research Gaps")
-    gaps = proposal.get("research_gaps", [])
-    if isinstance(gaps, list):
-        for gap in gaps:
-            gap_str = str(gap).strip()
-            p = doc.add_paragraph()
-            p.paragraph_format.space_after = Pt(6)
-            colon_idx = gap_str.find(":") if gap_str.upper().startswith("GAP") else -1
-            if colon_idx != -1:
-                _run(p, gap_str[: colon_idx + 1], bold=True)
-                _run(p, gap_str[colon_idx + 1:])
-            else:
-                _run(p, gap_str)
+    # 2.2 Theoretical Framework
+    _section_heading(doc, "2.2 Theoretical Framework")
+    theo = ch2.get("theoretical_framework") or {}
+    if isinstance(theo, dict) and theo:
+        _sub_heading(doc, "2.2.1 Agency Theory")
+        _body(doc, str(theo.get("agency_theory", "")))
+        _sub_heading(doc, "2.2.2 Signalling Theory")
+        _body(doc, str(theo.get("signalling_theory", "")))
+        _sub_heading(doc, "2.2.3 Stakeholder Theory")
+        _body(doc, str(theo.get("stakeholder_theory", "")))
+        _sub_heading(doc, "2.2.4 Positive Accounting Theory")
+        _body(doc, str(theo.get("positive_accounting_theory", "")))
     else:
-        _body(doc, str(gaps))
-    doc.add_page_break()
+        _body(doc, str(theo
+                       or _old_lit.get("theoretical_review", "")
+                       or proposal.get("theoretical_framework", "")))
 
-    # ── Chapter Three: Methodology ────────────────────────────────────────────
-    _chapter_heading(doc, "CHAPTER THREE: METHODOLOGY")
-    methodology = proposal.get("methodology", {})
-    method_sub_map = [
-        ("research_philosophy", "3.1 Research Philosophy"),
-        ("research_design", "3.2 Research Design"),
-        ("population_and_sampling", "3.3 Population and Sampling"),
-        ("data_collection", "3.4 Data Collection"),
-        ("model_specification", "3.5 Model Specification"),
-        ("analytical_techniques", "3.6 Analytical Techniques"),
-    ]
-    if isinstance(methodology, dict):
-        for key, heading in method_sub_map:
-            if key in methodology:
-                _section_heading(doc, heading)
-                if key == "model_specification":
-                    _add_model_specification(doc, str(methodology[key]))
-                else:
-                    _body(doc, str(methodology[key]))
-
-    # 3.7 Data Sources and Variables — pipe-delimited table
-    _section_heading(doc, "3.7 Data Sources and Variables")
-    variables = proposal.get("data_sources_and_variables", [])
-    if isinstance(variables, list) and variables:
-        headers = ["Variable", "Proxy", "Source", "Period"]
-        table = doc.add_table(rows=1, cols=len(headers))
-        table.style = "Table Grid"
-        _table_header(table, headers)
-        for var in variables:
-            if isinstance(var, dict):
-                _table_row(table, [
-                    var.get("variable", ""), var.get("proxy", ""),
-                    var.get("source", ""), var.get("period", ""),
-                ])
-            else:
-                _table_row(table, [str(var), "", "", ""])
-        doc.add_paragraph()
+    # 2.3 Empirical Review
+    _section_heading(doc, "2.3 Empirical Review")
+    empirical = ch2.get("empirical_review") or {}
+    if isinstance(empirical, dict) and empirical:
+        _sub_heading(doc, "2.3.1 IFRS and Banking Stability \u2014 International Evidence")
+        _body(doc, str(empirical.get("ifrs_banking_stability_international", "")))
+        _sub_heading(doc, "2.3.2 IFRS and Going Concern \u2014 African Evidence")
+        _body(doc, str(empirical.get("ifrs_going_concern_africa", "")))
+        _sub_heading(doc, "2.3.3 IFRS 9 ECL and Credit Risk in Nigerian Banks")
+        _body(doc, str(empirical.get("ifrs9_ecl_nigerian_banks", "")))
+        _sub_heading(doc,
+                     "2.3.4 Union Bank of Nigeria PLC \u2014 Prior Studies and Context")
+        _body(doc, str(empirical.get("union_bank_prior_studies", "")))
     else:
-        _body(doc, str(variables))
+        _body(doc, str(empirical or _old_lit.get("empirical_review", "")))
+
+    # 2.4 Identification of Research Gaps
+    _section_heading(doc, "2.4 Identification of Research Gaps")
+    gaps = ch2.get("research_gaps") or proposal.get("research_gaps", [])
+    _render_gaps(doc, gaps)
+
+    # 2.5 Summary of Literature Review
+    _section_heading(doc, "2.5 Summary of Literature Review")
+    _body(doc, str(ch2.get("summary_of_literature", "")))
+
+    # ── CHAPTER THREE: RESEARCH METHODOLOGY ──────────────────────────────────
     doc.add_page_break()
+    _chapter_heading(doc, "CHAPTER THREE \u2014 RESEARCH METHODOLOGY")
 
-    # ── Chapter Four: Expected Findings and Contributions ─────────────────────
-    _chapter_heading(doc, "CHAPTER FOUR: EXPECTED FINDINGS AND CONTRIBUTIONS")
-    _add_with_union_bank_treatment(doc, str(proposal.get("expected_findings", "")))
+    _section_heading(doc, "3.1 Research Design")
+    _body(doc, str(
+        ch3.get("research_design") or _old_meth.get("research_design", "")))
 
-    # 4.2 Ethical Considerations
-    _section_heading(doc, "4.2 Ethical Considerations")
-    _body(doc, str(proposal.get("ethical_considerations", "")))
+    _section_heading(doc, "3.2 Research Philosophy")
+    _body(doc, str(
+        ch3.get("research_philosophy") or _old_meth.get("research_philosophy", "")))
+
+    _section_heading(doc, "3.3 Population and Sample")
+    _body(doc, str(
+        ch3.get("population_and_sample")
+        or _old_meth.get("population_and_sampling", "")))
+
+    _section_heading(doc, "3.4 Sources of Data")
+    _body(doc, str(
+        ch3.get("sources_of_data") or _old_meth.get("data_collection", "")))
+
+    _section_heading(doc, "3.5 Data Collection Procedure")
+    _body(doc, str(ch3.get("data_collection_procedure", "")))
+
+    _section_heading(doc, "3.6 Operationalisation of Variables")
+    variables = (ch3.get("variable_operationalisation")
+                 or proposal.get("data_sources_and_variables", []))
+    _render_var_table(doc, variables)
+
+    _section_heading(doc, "3.7 Model Specification")
+    _add_model_specification(doc, str(
+        ch3.get("model_specification") or _old_meth.get("model_specification", "")))
+
+    _section_heading(doc, "3.8 Method of Data Analysis")
+    _body(doc, str(
+        ch3.get("method_of_data_analysis")
+        or _old_meth.get("analytical_techniques", "")))
+
+    _section_heading(doc, "3.9 Validity and Reliability of Secondary Data")
+    _body(doc, str(ch3.get("validity_and_reliability", "")))
+
+    _section_heading(doc, "3.10 Ethical Considerations")
+    _body(doc, str(
+        ch3.get("ethical_considerations")
+        or proposal.get("ethical_considerations", "")))
+
+    # ── REFERENCES ────────────────────────────────────────────────────────────
     doc.add_page_break()
-
-    # ── References ────────────────────────────────────────────────────────────
     _chapter_heading(doc, "REFERENCES")
     references = proposal.get("references", [])
     if isinstance(references, list):
@@ -721,16 +858,19 @@ def format_dissertation(proposal: dict) -> Document:
             p = doc.add_paragraph()
             p.paragraph_format.first_line_indent = Inches(-0.5)
             p.paragraph_format.left_indent = Inches(0.5)
-            p.paragraph_format.space_after = Pt(4)
+            p.paragraph_format.space_after = Pt(6)
             r = p.add_run(str(ref).strip())
             r.font.name = _FONT_NAME
             r.font.size = Pt(11)
     else:
         _body(doc, str(references))
-    doc.add_page_break()
 
-    # ── Appendices ────────────────────────────────────────────────────────────
-    _chapter_heading(doc, "APPENDICES")
+    # ── APPENDIX A ────────────────────────────────────────────────────────────
+    doc.add_page_break()
+    _chapter_heading(doc,
+                     "APPENDIX A \u2014 Union Bank of Nigeria PLC "
+                     "Financial Data Table (2015\u20132022)")
+
     appendices = proposal.get("appendices", {})
     ub_table_raw = ""
     if isinstance(appendices, dict):
@@ -738,7 +878,6 @@ def format_dissertation(proposal: dict) -> Document:
     elif appendices:
         ub_table_raw = str(appendices)
 
-    # Table caption
     cap = doc.add_paragraph()
     cap.paragraph_format.space_after = Pt(4)
     _run(cap,
@@ -749,9 +888,20 @@ def format_dissertation(proposal: dict) -> Document:
     _add_ub_financial_table(doc, ub_table_raw)
     doc.add_paragraph()
 
-    # Narrative note
     _sub_heading(doc, "Appendix Note: Narrative Analysis of Union Bank Transition Events")
     _add_ub_narrative_note(doc, ub_table_raw)
+
+    # ── APPENDIX B ────────────────────────────────────────────────────────────
+    doc.add_page_break()
+    _chapter_heading(doc,
+                     "APPENDIX B \u2014 List of Variables, Proxies and Sources")
+    appendix_b = ""
+    if isinstance(appendices, dict):
+        appendix_b = appendices.get("appendix_b_variables", "")
+    _body(doc,
+          str(appendix_b) if appendix_b else
+          "See Section 3.6 (Operationalisation of Variables) in Chapter Three "
+          "for the complete variable operationalisation table.")
 
     return doc
 
