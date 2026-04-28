@@ -352,7 +352,8 @@ def _add_with_union_bank_treatment(doc: Document, text: str) -> None:
             in_ub_block = True
         elif not is_ub:
             in_ub_block = False
-        # _body calls _enforce_ub_scope again — that is idempotent and harmless
+        # _body also calls _enforce_ub_scope; the function is idempotent so
+        # double-application is harmless and provides defensive coverage.
         _body(doc, para)
 
 
