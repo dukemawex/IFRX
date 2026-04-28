@@ -259,7 +259,7 @@ def _body(doc: Document, text: str) -> None:
         return
     p = doc.add_paragraph()
     p.paragraph_format.space_after = Pt(6)
-    _run(p, str(text).strip())
+    _run(p, _enforce_ub_scope(str(text).strip()))
 
 
 def _table_header(table, headers: list[str]) -> None:
@@ -286,14 +286,64 @@ def _split_paragraphs(text: str) -> list[str]:
     return [p.strip() for p in re.split(r"\n{2,}", text.strip()) if p.strip()]
 
 
+# ── Scope-enforcement substitutions ──────────────────────────────────────────
+# Replace any multi-bank / panel-study framing that may survive in the JSON
+# with Union-Bank-only language, keeping the study as a single-entity case study.
+
+_SCOPE_PATTERNS: list[tuple[re.Pattern, str]] = [
+    # explicit "10 listed Nigerian banks" and close variants
+    (re.compile(r"\b10\s+listed\s+(?:Nigerian\s+)?banks?\b", re.IGNORECASE),
+     "Union Bank of Nigeria PLC"),
+    # "listed deposit money banks" (NDIC/CBN terminology for the broader sector)
+    (re.compile(r"\blisted\s+deposit\s+money\s+banks?\b", re.IGNORECASE),
+     "Union Bank of Nigeria PLC"),
+    # "panel data across/of/from/for multiple banks" → longitudinal framing
+    (re.compile(
+        r"\bpanel\s+data\s+(?:across|of|from|for)\s+(?:multiple\s+)?(?:listed\s+)?banks?\b",
+        re.IGNORECASE),
+     "longitudinal data for Union Bank of Nigeria PLC"),
+    # residual "multiple banks"
+    (re.compile(r"\bmultiple\s+banks?\b", re.IGNORECASE),
+     "Union Bank of Nigeria PLC"),
+    # sector-wide / panel study framing
+    (re.compile(r"\bsector-?wide\s+panel\s+study\b", re.IGNORECASE),
+     "single-entity longitudinal case study"),
+    (re.compile(r"\bpanel\s+data\s+analysis\b", re.IGNORECASE),
+     "longitudinal data analysis"),
+    # bare "panel data" where it implies multi-entity framing
+    (re.compile(r"\bpanel\s+data\b", re.IGNORECASE),
+     "longitudinal data"),
+    # "panel study" / "panel research"
+    (re.compile(r"\bpanel\s+(?:study|research)\b", re.IGNORECASE),
+     "longitudinal case study"),
+    # "population of … banks" → sole population = Union Bank
+    (re.compile(
+        r"\bpopulation\s+of\s+(?:all\s+)?(?:\d+\s+)?(?:listed\s+)?(?:Nigerian\s+)?(?:commercial\s+)?banks?\b",
+        re.IGNORECASE),
+     "Union Bank of Nigeria PLC as the sole unit of analysis"),
+    # "sampled banks" / "selected banks" / "the banks"
+    (re.compile(r"\b(?:sampled|selected)\s+banks?\b", re.IGNORECASE),
+     "Union Bank of Nigeria PLC"),
+]
+
+
+def _enforce_ub_scope(text: str) -> str:
+    """Replace multi-bank / panel-study framing with Union Bank of Nigeria PLC."""
+    for pattern, replacement in _SCOPE_PATTERNS:
+        text = pattern.sub(replacement, text)
+    return text
+
+
 def _add_with_union_bank_treatment(doc: Document, text: str) -> None:
     """
     Emit body paragraphs.  Any paragraph that mentions Union Bank is preceded
     by a 'Case Illustration: Union Bank of Nigeria PLC' subsection heading.
+    Scope enforcement is applied before the Union Bank check so that converted
+    multi-bank references are also treated as Union Bank paragraphs.
     """
     if not text:
         return
-    paragraphs = _split_paragraphs(str(text))
+    paragraphs = _split_paragraphs(_enforce_ub_scope(str(text)))
     in_ub_block = False
     for para in paragraphs:
         is_ub = bool(re.search(r"\bunion\s+bank\b", para, re.IGNORECASE))
@@ -302,6 +352,7 @@ def _add_with_union_bank_treatment(doc: Document, text: str) -> None:
             in_ub_block = True
         elif not is_ub:
             in_ub_block = False
+        # _body calls _enforce_ub_scope again — that is idempotent and harmless
         _body(doc, para)
 
 
@@ -559,11 +610,6 @@ def format_dissertation(proposal: dict) -> Document:
 
     doc.add_page_break()
 
-    # ── Abstract ──────────────────────────────────────────────────────────────
-    _chapter_heading(doc, "ABSTRACT")
-    _body(doc, proposal.get("abstract", ""))
-    doc.add_page_break()
-
     # ── Chapter One: Introduction ─────────────────────────────────────────────
     _chapter_heading(doc, "CHAPTER ONE: INTRODUCTION")
     _add_with_union_bank_treatment(doc, str(proposal.get("introduction", "")))
@@ -580,7 +626,7 @@ def format_dissertation(proposal: dict) -> Document:
             p = doc.add_paragraph()
             p.paragraph_format.left_indent = Inches(0.25)
             p.paragraph_format.space_after = Pt(4)
-            _run(p, f"{i}. {obj}")
+            _run(p, f"{i}. {_enforce_ub_scope(str(obj))}")
     else:
         _body(doc, str(objectives))
 
@@ -592,7 +638,7 @@ def format_dissertation(proposal: dict) -> Document:
             p = doc.add_paragraph()
             p.paragraph_format.left_indent = Inches(0.25)
             p.paragraph_format.space_after = Pt(4)
-            _run(p, f"{i}. {q}")
+            _run(p, f"{i}. {_enforce_ub_scope(str(q))}")
     else:
         _body(doc, str(questions))
 
@@ -605,12 +651,12 @@ def format_dissertation(proposal: dict) -> Document:
                 p = doc.add_paragraph()
                 p.paragraph_format.space_after = Pt(2)
                 _run(p, f"H0{i}: ", bold=True)
-                _run(p, str(hyp.get("null", "")))
+                _run(p, _enforce_ub_scope(str(hyp.get("null", ""))))
                 p2 = doc.add_paragraph()
                 p2.paragraph_format.space_after = Pt(6)
                 _run(p2, f"H{i}A: ", bold=True)
                 alt = hyp.get("alternative") or hyp.get("alternate", "")
-                _run(p2, str(alt))
+                _run(p2, _enforce_ub_scope(str(alt)))
             else:
                 _body(doc, str(hyp))
     else:
@@ -683,11 +729,11 @@ def format_dissertation(proposal: dict) -> Document:
                 else:
                     _body(doc, str(methodology[key]))
 
-    # 3.7 Data Sources and Variables — pipe-delimited table
-    _section_heading(doc, "3.7 Data Sources and Variables")
+    # 3.7 Data Sources and Variable Operationalisation — formatted table
+    _section_heading(doc, "3.7 Data Sources and Variable Operationalisation")
     variables = proposal.get("data_sources_and_variables", [])
     if isinstance(variables, list) and variables:
-        headers = ["Variable", "Proxy", "Source", "Period"]
+        headers = ["Variable", "Proxy Measure", "Data Source", "Time Period"]
         table = doc.add_table(rows=1, cols=len(headers))
         table.style = "Table Grid"
         _table_header(table, headers)
@@ -702,56 +748,6 @@ def format_dissertation(proposal: dict) -> Document:
         doc.add_paragraph()
     else:
         _body(doc, str(variables))
-    doc.add_page_break()
-
-    # ── Chapter Four: Expected Findings and Contributions ─────────────────────
-    _chapter_heading(doc, "CHAPTER FOUR: EXPECTED FINDINGS AND CONTRIBUTIONS")
-    _add_with_union_bank_treatment(doc, str(proposal.get("expected_findings", "")))
-
-    # 4.2 Ethical Considerations
-    _section_heading(doc, "4.2 Ethical Considerations")
-    _body(doc, str(proposal.get("ethical_considerations", "")))
-    doc.add_page_break()
-
-    # ── References ────────────────────────────────────────────────────────────
-    _chapter_heading(doc, "REFERENCES")
-    references = proposal.get("references", [])
-    if isinstance(references, list):
-        for ref in _sort_references(references):
-            p = doc.add_paragraph()
-            p.paragraph_format.first_line_indent = Inches(-0.5)
-            p.paragraph_format.left_indent = Inches(0.5)
-            p.paragraph_format.space_after = Pt(4)
-            r = p.add_run(str(ref).strip())
-            r.font.name = _FONT_NAME
-            r.font.size = Pt(11)
-    else:
-        _body(doc, str(references))
-    doc.add_page_break()
-
-    # ── Appendices ────────────────────────────────────────────────────────────
-    _chapter_heading(doc, "APPENDICES")
-    appendices = proposal.get("appendices", {})
-    ub_table_raw = ""
-    if isinstance(appendices, dict):
-        ub_table_raw = appendices.get("union_bank_financial_table", "")
-    elif appendices:
-        ub_table_raw = str(appendices)
-
-    # Table caption
-    cap = doc.add_paragraph()
-    cap.paragraph_format.space_after = Pt(4)
-    _run(cap,
-         "Table A1: Union Bank of Nigeria PLC \u2014 "
-         "Key Financial and Audit Indicators (2015\u20132022)",
-         bold=True)
-
-    _add_ub_financial_table(doc, ub_table_raw)
-    doc.add_paragraph()
-
-    # Narrative note
-    _sub_heading(doc, "Appendix Note: Narrative Analysis of Union Bank Transition Events")
-    _add_ub_narrative_note(doc, ub_table_raw)
 
     return doc
 
