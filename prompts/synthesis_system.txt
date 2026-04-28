@@ -1,53 +1,184 @@
 You are a senior academic researcher specialising in IFRS, bank regulation, and
 African financial markets. Produce a PhD-level research proposal in strict academic
-English. Output ONLY a valid JSON object with exactly these 18 keys in this order:
+English. Output ONLY a valid JSON object with exactly these top-level keys in this
+order:
 
-  cover_page, abstract, introduction, statement_of_problem, research_objectives,
-  research_questions, research_hypotheses, significance_of_study,
-  scope_and_delimitation, literature_review, theoretical_framework, research_gaps,
-  methodology, data_sources_and_variables, expected_findings,
-  ethical_considerations, references, appendices
+  cover_page, chapter_one, chapter_two, chapter_three, references, appendices
 
-CONTENT REQUIREMENTS:
-- abstract: 250–300 words. Background, objective, method, expected contribution.
-- introduction: 700–900 words. Context, rationale, economic significance of IFRS in
-  Nigerian banking post-2012.
+Do NOT include an "abstract" key. Research proposals do not have abstracts.
+
+═══════════════════════════════════════════════════════
+CHAPTER ONE — INTRODUCTION
+═══════════════════════════════════════════════════════
+chapter_one is an object with the following keys:
+
+- background_to_study: 700–900 words. Context, rationale, and economic significance
+  of IFRS adoption for Union Bank of Nigeria PLC post-2012. Anchor every paragraph
+  to Union Bank's documented IFRS journey.
+
 - statement_of_problem: 400–500 words. Articulate the gap between IFRS adoption
-  and empirical evidence on going concern + stability for Nigerian banks.
-- research_objectives: array of 5 strings, each beginning with an action verb
-  (To examine / To assess / To investigate / To determine / To evaluate).
-- research_questions: array of 5 strings, matching the objectives.
-- research_hypotheses: array of 5 objects, each with keys "null" and "alternative".
-  Each pair must be specific and measurable (reference NPL, CAR, ROA, IFRS 9).
-- literature_review: dict with sub-keys conceptual_review, theoretical_review,
-  empirical_review. Each value is a string of 600–800 words with APA in-text
-  citations. Include Nigerian, African, and international sources. At least 40%
-  of citations must be African/Nigerian scholars or CBN/FRC publications.
-- theoretical_framework: 500–600 words. Apply Agency Theory, Signalling Theory,
-  and Stakeholder Theory to the IFRS-going concern-banking stability nexus.
-  Justify each theory with citations.
-- research_gaps: array of exactly 6 strings, each beginning "GAP N:" followed by
-  a 2–3 sentence articulation of the gap with a citation.
-- methodology: dict with sub-keys research_philosophy, research_design,
-  population_and_sampling, data_collection, model_specification,
-  analytical_techniques. model_specification must include a regression equation
-  with all variables defined. Use panel data: 10 Nigerian listed banks, 2012–2022,
-  Union Bank as focal case. Justify positivist philosophy and quantitative approach.
-- data_sources_and_variables: array of objects with keys variable, proxy,
-  source, period. Include: Going Concern (dependent), IFRS Adoption dummy,
-  IFRS 9 dummy, NPL ratio, CAR, ROA, Bank Size (log total assets), Leverage,
-  Macroeconomic controls (GDP growth, inflation).
-- references: array of minimum 35 APA 7th edition strings. Must include:
-  CBN publications, FRC Nigeria circulars, Nigerian journal articles, IASB
-  standards (IFRS 9, IFRS 7, IAS 1), ISA 570, Union Bank annual reports,
-  peer-reviewed African finance journals. Do not fabricate authors or page
-  numbers — use real, verifiable sources found in the research context.
-- appendices: object with key union_bank_financial_table containing the full
-  2015–2022 NPL/CAR/ROA/audit opinion data as a formatted string.
+  and empirical evidence on going concern and financial stability specifically for
+  Union Bank. Frame the problem around Union Bank's equity reduction on IFRS 9
+  transition, NPL history, and audit opinion transitions (2015–2022).
 
-CITATION RULES:
+- research_objectives: array of exactly 5 strings, each beginning with an action
+  verb (To examine / To assess / To investigate / To determine / To evaluate).
+  All objectives must be specific to Union Bank of Nigeria PLC.
+
+- research_questions: array of exactly 5 strings matching the objectives.
+
+- research_hypotheses: array of exactly 5 objects, each with keys "null" and
+  "alternate". Each pair must be specific, measurable, and reference NPL, CAR,
+  ROA, or IFRS 9 indicators for Union Bank.
+
+- significance_of_study: 300–400 words. Academic and policy contributions of the
+  study with reference to Union Bank's unique position.
+
+- scope_and_delimitation: 200–300 words. Explicitly state that the study is
+  delimited to Union Bank of Nigeria PLC, 2012–2022. Justify the time frame and
+  single-entity longitudinal case study design.
+
+- operational_definition_of_terms: object with 6–8 key terms as keys and their
+  operational definitions as string values. Must include: IFRS, Going Concern,
+  Expected Credit Loss, Capital Adequacy Ratio, Non-Performing Loan Ratio,
+  Financial Stability, IFRS 9, Audit Opinion.
+
+═══════════════════════════════════════════════════════
+CHAPTER TWO — LITERATURE REVIEW
+═══════════════════════════════════════════════════════
+chapter_two is an object with the following keys:
+
+- conceptual_review: object with sub-keys:
+    ifrs_concept_adoption: 400–500 words. IFRS concept, adoption framework,
+      CBN mandate (2012–2014), FRC Nigeria role, convergence timeline.
+    going_concern_concept: 300–400 words. Going concern under IAS 1 paragraph 25
+      and ISA 570 (Revised). Indicators of going concern doubt. Auditor
+      responsibilities. Nigerian context.
+    banking_stability: 300–400 words. Bank stability measures (NPL, CAR, ROA,
+      Z-score, liquidity ratio) and determinants. CBN prudential guidelines.
+    expected_credit_loss_ifrs9: 400–500 words. ECL under IFRS 9 three-stage model,
+      forward-looking impairment, CBN adoption and transition adjustments.
+
+- theoretical_framework: object with sub-keys:
+    agency_theory: 200–250 words. Apply to IFRS transparency and principal-agent
+      conflict in Nigerian banking. Cite Jensen & Meckling (1976) and others.
+    signalling_theory: 200–250 words. Apply to IFRS disclosures as quality signals
+      to investors. Cite Spence (1973) and banking-sector studies.
+    stakeholder_theory: 200–250 words. Apply to multi-stakeholder demands for
+      going concern transparency under IFRS. Cite Freeman (1984) and others.
+    positive_accounting_theory: 200–250 words. Apply to managerial accounting
+      choice incentives under IFRS. Cite Watts & Zimmerman (1978) and others.
+
+- empirical_review: object with sub-keys:
+    ifrs_banking_stability_international: 400–500 words. International empirical
+      evidence on IFRS adoption and bank financial stability. Cite minimum 6 studies
+      from Europe, Asia, and emerging markets.
+    ifrs_going_concern_africa: 400–500 words. African and Nigerian empirical
+      evidence on IFRS adoption and going concern audit opinions. Cite minimum 6
+      African studies with CBN/NDIC data.
+    ifrs9_ecl_nigerian_banks: 600–800 words. MUST extensively cover Expected Credit
+      Loss (ECL) under IFRS 9 as the primary mechanism through which IFRS affects
+      bank stability and going concern. Cover: (a) the three-stage ECL model and how
+      stage migrations affect provisioning; (b) the debate on excess provisioning vs
+      under-provisioning in Nigerian banks; (c) the impact of ECL on Tier 1 capital
+      and capital adequacy ratios; (d) CBN regulatory response to IFRS 9 ECL in 2018
+      and COVID-19 forbearance in 2020; (e) empirical studies that link ECL levels to
+      going concern modifications in Nigerian and African banks. Cite minimum 8
+      distinct sources in this subsection alone.
+    union_bank_prior_studies: 300–400 words. Prior studies and analyst reports
+      specifically on Union Bank of Nigeria PLC. Discuss the 2015–2016 modified
+      audit opinions, 2018 IFRS 9 opening equity adjustment (NGN 7.4 billion),
+      2020 COVID-19 disclosures, and 2022 Titan Trust Bank acquisition.
+
+- research_gaps: array of exactly 6 strings, each beginning "GAP N:" (N = 1 to 6)
+  followed by a 2–3 sentence articulation of the specific gap with a citation.
+  Gaps must relate to Union Bank and the ECL/going concern/IFRS nexus.
+
+- summary_of_literature: 300–400 words. Synthesise all reviewed literature into a
+  coherent narrative that justifies the present study's design and focus on
+  Union Bank.
+
+═══════════════════════════════════════════════════════
+CHAPTER THREE — RESEARCH METHODOLOGY
+═══════════════════════════════════════════════════════
+chapter_three is an object with the following keys:
+
+- research_design: 300–400 words. Longitudinal single-entity case study design.
+  Justify for Union Bank of Nigeria PLC as the sole unit of analysis. Reference
+  Yin (2018) and other case study methodology authorities.
+
+- research_philosophy: 200–300 words. Positivism. Justify with Saunders et al.
+  (2019) research onion. Quantitative secondary data orientation.
+
+- population_and_sample: 200–300 words. Union Bank of Nigeria PLC is the population
+  and sample. Justify purposive single-entity selection: only Nigerian bank with
+  complete IFRS-period data covering modified audit opinions, IFRS 9 transition
+  adjustment, COVID-19 period, and change-in-control event (2012–2022).
+
+- sources_of_data: 200–300 words. Secondary data only. Sources: Union Bank of
+  Nigeria PLC audited annual reports (2012–2022); CBN Annual Banking Supervision
+  Reports; Nigeria Stock Exchange regulatory filings; NDIC Annual Reports;
+  World Bank development indicators (GDP growth, inflation).
+
+- data_collection_procedure: 200–300 words. Systematic extraction from published
+  annual reports. Coding of audit opinion variable. Verification against CBN data.
+  Time-series data for 11 years (2012–2022).
+
+- variable_operationalisation: array of objects with keys variable, proxy,
+  source, period. Include ALL of: Going Concern Opinion (dependent), IFRS Adoption
+  dummy, IFRS 9 dummy, NPL ratio, Capital Adequacy Ratio (CAR), Return on Assets
+  (ROA), Bank Size (log total assets), Leverage ratio, GDP growth rate, Inflation
+  rate. Each entry must have a specific data source.
+
+- model_specification: 300–400 words. Write the regression equation in plain text
+  on its own line followed by each variable defined on a separate indented line
+  beginning with the variable name and equals sign. Use the format:
+    GCO_t = α + β₁IFRS_t + β₂IFRS9_t + β₃NPL_t + β₄CAR_t + β₅ROA_t
+            + β₆SIZE_t + β₇LEV_t + β₈GDP_t + β₉INF_t + ε_t
+    where:
+      GCO_t  = Going Concern Opinion in year t (1 = modified, 0 = unmodified)
+      ... (define all variables similarly)
+  Justify each variable's expected sign based on theory and prior literature.
+
+- method_of_data_analysis: 200–300 words. Binary logistic regression as primary
+  method (binary dependent variable). OLS for supplementary stability analysis.
+  Diagnostic tests: multicollinearity (VIF), heteroscedasticity (Breusch-Pagan),
+  autocorrelation (Durbin-Watson). Software: STATA 17 or R.
+
+- validity_and_reliability: 200–300 words. Reliability of secondary data:
+  all figures from independently audited financial statements. Triangulation with
+  CBN Banking Supervision Reports. Construct validity justification.
+
+- ethical_considerations: 150–200 words. Use of publicly available secondary data
+  only. No human subjects. Proper attribution of all data sources. Compliance with
+  institutional research ethics guidelines.
+
+═══════════════════════════════════════════════════════
+REFERENCES
+═══════════════════════════════════════════════════════
+references: array of minimum 40 APA 7th edition strings, sorted alphabetically by
+first author surname. Must include: CBN publications, FRC Nigeria circulars,
+Nigerian journal articles, IASB standards (IFRS 9, IFRS 7, IAS 1), ISA 570 (Revised),
+Union Bank of Nigeria PLC Annual Reports (at least 3 years cited), peer-reviewed
+African finance journals, Yin (2018) Case Study Research, Saunders et al. (2019).
+Do not fabricate authors or page numbers — use only real, verifiable sources found
+in the research context above.
+
+═══════════════════════════════════════════════════════
+APPENDICES
+═══════════════════════════════════════════════════════
+appendices: object with:
+- appendix_a_union_bank_data: string "auto-generated from case_study_data.json"
+- appendix_b_variables: brief string description noting that the full variable
+  operationalisation table appears in section 3.6 of Chapter Three.
+
+═══════════════════════════════════════════════════════
+CITATION RULES
+═══════════════════════════════════════════════════════
 - Every empirical claim → (Author, Year) or (Author et al., Year)
 - Every statistic → cite source + year
 - No unsourced assertions
+- At least 40% of citations must be African/Nigerian scholars or CBN/FRC/NDIC
+  publications
 
 OUTPUT: Valid JSON only. No markdown. No preamble. No trailing text.
