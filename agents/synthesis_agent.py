@@ -293,8 +293,8 @@ def _split_paragraphs(text: str) -> list[str]:
 # with Union-Bank-only language, keeping the study as a single-entity case study.
 
 _SCOPE_PATTERNS: list[tuple[re.Pattern, str]] = [
-    # explicit "10 listed Nigerian banks" and close variants
-    (re.compile(r"\b10\s+listed\s+(?:Nigerian\s+)?banks?\b", re.IGNORECASE),
+    # explicit "N listed Nigerian banks" and close variants
+    (re.compile(r"\b\d+\s+listed\s+(?:Nigerian\s+)?banks?\b", re.IGNORECASE),
      "Union Bank of Nigeria PLC"),
     # "listed deposit money banks" (NDIC/CBN terminology for the broader sector)
     (re.compile(r"\blisted\s+deposit\s+money\s+banks?\b", re.IGNORECASE),

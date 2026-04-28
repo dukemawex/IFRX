@@ -5,6 +5,7 @@ research/case_study_data.json, saving to output/proposal_ifrs_union_bank.docx.
 """
 
 import json
+import re
 from datetime import datetime
 from pathlib import Path
 
@@ -414,11 +415,10 @@ def build_document(proposal: dict, case_study: dict) -> Document:
     model_text = str(
         ch3.get("model_specification") or _old_meth.get("model_specification", ""))
     # Render equation on its own line; definitions indented beneath it
-    import re as _re
-    where_m = _re.search(r"\bwhere\b[:\s]", model_text, _re.IGNORECASE)
+    where_m = re.search(r"\bwhere\b[:\s]", model_text, re.IGNORECASE)
     if where_m:
         _body(doc, model_text[: where_m.start()].strip())
-        for defn in _re.split(r"[;\n]", model_text[where_m.start():]):
+        for defn in re.split(r"[;\n]", model_text[where_m.start():]):
             defn = defn.strip()
             if defn:
                 p = doc.add_paragraph(style="Normal")
